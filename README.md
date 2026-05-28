@@ -1,5 +1,5 @@
-# Pair-Conditioned-Interaction-Modeling-for-Cold-Start-Drug-Target-Affinity-Prediction
-a pair-conditioned interaction framework for adaptive drug–target affinity prediction, particularly robust under cold-start scenarios (unseen drugs or unseen targets).
+# Pair-Conditioned Interaction Modeling for Cold-Start Drug–Target Affinity Prediction
+a Pair-Conditioned Interaction Modeling for Cold-Start Drug–Target Affinity Prediction, particularly robust under cold-start scenarios (unseen drugs or unseen targets).
 ## 📄 Paper Overview
 
 Predicting drug–target binding affinity is a fundamental task in computational drug discovery. Most existing DTA methods use a **globally shared interaction function** for all drug–target pairs, which is insufficient to capture the diverse, pair-specific nature of molecular interactions.
