@@ -1,4 +1,4 @@
-# Pair-Conditioned Interaction Modeling for Cold-Start Drug–Target Affinity Prediction
+# CoDA-DTA: Context-Driven Adaptive Interaction Learning for Cold-Start Drug–Target Affinity Prediction
 a Pair-Conditioned Interaction Modeling for Cold-Start Drug–Target Affinity Prediction, particularly robust under cold-start scenarios (unseen drugs or unseen targets).
 ## 📄 Paper Overview
 
