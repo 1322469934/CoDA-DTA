@@ -60,9 +60,6 @@ The required Python libraries are listed in `requirements.txt`:
 - `transformers`
 - `pandas`
 - `numpy`
-- `scikit-learn`
-- `rdkit-pypi`
-- `tqdm`
 
 Install them with:
 
