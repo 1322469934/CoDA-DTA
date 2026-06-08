@@ -15,17 +15,6 @@ class LowRankConditionalGenerator(nn.Module):
         dropout: float = 0.1,
     ):
 
-        super().__init__()
-        self.hidden_dim = hidden_dim
-        self.rank = rank
-
-        input_dim = hidden_dim * 2  
-
-        self.context_mlp = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim, hidden_dim * rank * 2), 
         )
 
         self.W_base = nn.Parameter(
