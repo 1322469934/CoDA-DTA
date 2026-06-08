@@ -32,46 +32,154 @@ PIC-DTA addresses this limitation by introducing a **Pair-Conditioned Interactio
 │                    └────────────────────────────────────┘ │
 └──────────────────────────────────────────────────────────┘
 ```
+## Installation
 
-### Key Features
+Create a Python environment and install the required libraries:
 
-- **Pair-Conditioned Interaction**: Dynamically adjusts interaction patterns based on pair-level contextual information, replacing fixed global fusion functions
-- **Low-Rank Conditional Parameterization**: `ΔW(c) = A(c)·B(c)` with rank `r << d`, achieving adaptive modeling with modest parameter overhead
-- **Dual Pre-trained Encoders**: ChemBERTa-2 for drugs + frozen ESM-2 for proteins, leveraging complementary molecular representations
-- **Cold-Start Robustness**: Superior generalization on unseen drugs and unseen targets (Davis & KIBA benchmarks)
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
 
-## 🔬 Cold-Start Split Strategies
+On Linux/macOS, use:
 
-PIC-DTA supports three data split modes:
+```bash
+source .venv/bin/activate
+```
 
-| Mode | Description | Use Case |
-|------|-------------|----------|
-| `warm` | Random split across all pairs | Standard generalization |
-| `cold_drug` | Split by drug — test drugs unseen during training | New drug candidate screening |
-| `cold_target` | Split by target — test targets unseen during training | Novel target identification |
+Python 3.9 or newer is recommended. The code can run on CPU. A CUDA-capable GPU is recommended for training or large-scale prediction.
 
-## 📊 Model Architecture Details
 
-### Dual-Stream Encoders
+## Requirements
 
-**Drug Encoder (ChemBERTa-2)**
-- Input: SMILES string → tokenized with ChemBERTa tokenizer
-- Output: `H_d ∈ R^{L×d}` (sequence), `h_d = H_d[CLS]` (global)
-- Configurable fine-tuning
+The required Python libraries are listed in `requirements.txt`:
 
-**Protein Encoder (ESM-2, Frozen)**
-- Input: Amino acid sequence → spaced tokens for ESM tokenizer
-- Output: `H_p ∈ R^{M×d}` (sequence), `h_p = H_p[0]` (global)
-- Frozen to preserve pre-trained representations
+- `torch`
+- `transformers`
+- `pandas`
+- `numpy`
+- `scikit-learn`
+- `rdkit-pypi`
+- `tqdm`
 
-### PCIF: Pair-Conditioned Interaction Function
+Install them with:
 
-1. **Pair Context Generation**: `c_pair = MLP([h_d || h_p]) ∈ R^{2d}`
-2. **Low-Rank Conditional Parameterization**: Generate `ΔW_Q, ΔW_K, ΔW_V` for both drug→protein and protein→drug cross-attention via `ΔW(c) = A(c)·B(c)` with `A ∈ R^{d×r}, B ∈ R^{r×d}`
-3. **Bi-directional Cross-Attention**: Drug attends to protein features and vice versa
-4. **Gated Fusion**: Learnable gates control information flow from each direction
-5. **Mean Pooling + MLP**: Pooled pair representation → multi-layer MLP → affinity prediction
+```bash
+pip install -r requirements.txt
+```
 
-### Parameter Efficiency
+## Data format
 
-The low-rank decomposition (`r = 8` for `d = 256`) means each dynamic projection matrix is parameterized by only `d × r + r × d = 2dr = 4,096` additional parameters instead of `d² = 65,536` for full matrices — a **16× reduction**.
+Training, validation, and test CSV files should use the following columns:
+
+```text
+drug_id,smiles,target_id,protein_sequence,affinity
+```
+
+Prediction CSV files should use:
+
+```text
+drug_id,smiles,target_id,protein_sequence
+```
+
+`smiles` is the molecular SMILES representation of the drug. `protein_sequence` is the amino-acid sequence of the target protein. `affinity` should be a numeric value on one consistent scale within a dataset.
+
+## Dataset preparation
+
+Davis, KIBA, or user-provided data should be converted to the unified CSV format above before training or evaluation. If the original Davis/KIBA files cannot be redistributed, provide instructions or scripts to convert locally downloaded raw files into this CSV format.
+
+For a CSV that is already in the unified format, split it with:
+
+```bash
+python prepare_dataset.py --input data/all_pairs.csv --output_dir data/processed/davis_warm --split_type warm --seed 42
+```
+
+This creates:
+
+- `train.csv`
+- `valid.csv`
+- `test.csv`
+- `split_info.json`
+
+## Data splitting
+
+The helper script supports three split types:
+
+- `warm`: random split of drug-target interaction pairs.
+- `cold_drug`: test drugs do not appear in the training set.
+- `cold_target`: test targets do not appear in the training set.
+
+A random/warm split may contain the same drug or target in both training and test sets. This can overestimate cold-start performance. Cold-start evaluation should therefore use `cold_drug` or `cold_target`.
+
+Examples:
+
+```bash
+python prepare_dataset.py --input data/all_pairs.csv --output_dir data/processed/davis_warm --split_type warm
+python prepare_dataset.py --input data/all_pairs.csv --output_dir data/processed/davis_cold_drug --split_type cold_drug
+python prepare_dataset.py --input data/all_pairs.csv --output_dir data/processed/davis_cold_target --split_type cold_target
+```
+
+Default ratios are 70% training, 10% validation, and 20% test. They can be changed:
+
+```bash
+python prepare_dataset.py --input data/all_pairs.csv --output_dir data/processed/custom --split_type cold_drug --train_ratio 0.7 --valid_ratio 0.1 --test_ratio 0.2 --seed 42
+```
+
+`split_info.json` records the split type, random seed, sample counts, drug overlap, and target overlap.
+
+## Training command
+
+Train with prepared CSV files:
+
+```bash
+python train.py --train_csv data/processed/davis_warm/train.csv --valid_csv data/processed/davis_warm/valid.csv --output checkpoints/davis_warm_model.pt --device cpu
+```
+
+For GPU training, use:
+
+```bash
+python train.py --train_csv data/processed/davis_warm/train.csv --valid_csv data/processed/davis_warm/valid.csv --output checkpoints/davis_warm_model.pt --device cuda
+```
+
+This command saves the best validation checkpoint to the path specified by `--output`.
+
+## Evaluation command
+
+Evaluate a trained checkpoint on a test CSV:
+
+```bash
+python evaluate.py --test_csv data/processed/davis_warm/test.csv --checkpoint checkpoints/davis_warm_model.pt --output results/davis_warm_metrics.csv --device cpu
+```
+
+The output CSV contains:
+
+- `MSE`
+- `CI`
+- `R2`
+
+These correspond to the metrics reported in the manuscript.
+
+## Prediction command
+
+Predict affinity for new drug-target pairs:
+
+```bash
+python predict.py --input example_inference.csv --checkpoint checkpoints/model.pt --output predictions.csv --device cpu
+```
+
+The input CSV must contain:
+
+```text
+drug_id,smiles,target_id,protein_sequence
+```
+
+The output CSV contains:
+
+```text
+drug_id,smiles,target_id,predicted_affinity
+```
+
+The script checks required input columns and creates the output directory if it does not exist.
+
