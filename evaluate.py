@@ -1,11 +1,6 @@
 import argparse
 from pathlib import Path
 
-import numpy as np
-import pandas as pd
-import torch
-from sklearn.metrics import mean_squared_error, r2_score
-from transformers import AutoTokenizer
 
 from pic_dta import PICDTA
 from predict import tokenize_batch
